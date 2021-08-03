@@ -1,0 +1,400 @@
+#!/home/sam/anaconda3/bin/python
+import lctemplatematch, argparse, numpy as np
+from astropy.table import Table
+from astropy.time import Time
+from scipy.signal import find_peaks
+import matplotlib.pyplot as plt 
+from scipy.stats.distributions import chi2
+import scipy 
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+from scipy.stats import median_abs_deviation
+
+def parse_args():
+	# Argument parser
+	parser = argparse.ArgumentParser('templatematch')
+
+	parser.add_argument("filename",
+						help='The filename from which to template search')
+
+	parser.add_argument('-a', 
+						'--period',
+						help='The orbital period in arbritraty time units consisting with the input file.',
+						default=10, type=float)  
+
+	parser.add_argument('-b', 
+						'--radius_1',
+						help='The radius of star 1 in units of the semi-major axis, a.',
+						default=0.2, type=float)  
+
+	parser.add_argument('-c', 
+						'--k',
+						help='The ratio of the radii of star 2 and star 1 (R2/R1).',
+						default=0.2, type=float)  
+		
+	parser.add_argument('-d', 
+						'--b',
+						help='The impact parameter of the orbit (incl = arccos(radius_1*b).',
+						default=0., type=float)  
+
+	parser.add_argument('-e', 
+						'--light_3',
+						help='The third light.',
+						default=0.0, type=float) 
+
+	parser.add_argument('-f', 
+						'--save_path',
+						help='Tha save path directory',
+						default='.',  type=str) 
+
+	parser.add_argument('-g', 
+						'--name',
+						help='The name of the star',
+						default='star',  type=str) 
+
+	parser.add_argument('-hi', 
+						'--threshold',
+						help='The threshold',
+						default=0., type=float) 
+
+	parser.add_argument('-j', 
+						'--bin',
+						help='Bin in minutes',
+						default=None, type=float) 
+
+	parser.add_argument('-k', 
+						'--keep',
+						help='The number of peaks to keep. Default is 10',
+						default=10, type=int) 
+
+	parser.add_argument('-l', 
+						'--fs',
+						help='fs.',
+						default=0.0, type=float) 
+	parser.add_argument('-m', 
+						'--fc',
+						help='fc',
+						default=0.0, type=float) 
+
+
+	parser.add_argument('-o', 
+						'--time_between_events',
+						help='The minimum distance  between events [hrs].',
+						default=24, type=float) 
+
+	parser.add_argument('-p', 
+						'--min_time_in_transit',
+						help='The minimum time in transit [hrs]',
+						default=0.1, type=float) 
+
+
+	parser.add_argument('-q', 
+						'--raw_alpha',
+						help='The raw_alpha',
+						default=0.1, type=float) 
+
+	parser.add_argument('-r', 
+						'--bin_alpha',
+						help='The bin alpha ',
+						default=0.5, type=float) 
+
+	parser.add_argument('-s', 
+						'--gradsplit',
+						help='To grad split the array.',
+						default=None, type=float)
+
+	parser.add_argument('-t', 
+						'--npoly',
+						help='To npoly for gradsplit',
+						default=3, type=int)
+						
+
+	parser.add_argument('--paophot2', action="store_true", default=False)
+	parser.add_argument('--mag', action="store_true", default=False)
+	parser.add_argument('--inject', action="store_true", default=False)
+
+
+	return parser.parse_args()
+
+def transit_width(r, k, b, P=1):
+    return P*np.arcsin(r*np.sqrt( ((1+k)**2-b**2) / (1-b**2*r**2) ))/np.pi
+
+def plot_loglike(time_supersampled, loglike_transit, threshold, peaks):
+	f, ax = plt.subplots(1,1, constrained_layout=True)
+	time_offset = int(np.min(time_supersampled.base))
+	ax.set(xlabel = 'Time [JD - {:,}]'.format(time_offset), ylabel = r'$\Delta \mathcal{L}$')
+	ax.plot(time_supersampled.base-time_offset, loglike_transit.base )
+	ax.set_ylim(0, None)
+
+	bbox = dict(boxstyle="round", fc="0.8")
+	arrowprops = dict(
+		arrowstyle = "->",
+		connectionstyle = "angle,angleA=0,angleB=90,rad=10")
+
+	for i in range(len(peaks)):
+		ax.text(time_supersampled.base[peaks[i]]-time_offset, loglike_transit.base[peaks[i]] + 0.05*np.max(loglike_transit.base[peaks])  , 'Peak {:}\n'.format(i+1) + r'$\mathcal{L}$ = ' + '{:,.2f}'.format(loglike_transit.base[peaks[i]]), bbox=bbox, horizontalalignment='center', fontsize=5)
+
+	return f, ax
+
+
+def plot_results(t, f, fe, time_supersampled, loglike_transit, peaks,
+                raw_alpha = 0.1, bin = None, bin_alpha=0.5):
+    
+    # Set up the plot
+    SMALL_SIZE = 8
+    MEDIUM_SIZE = 16
+    BIGGER_SIZE = 12
+
+    plt.rc('font', size=MEDIUM_SIZE)          # controls default text sizes
+    plt.rc('axes', titlesize=MEDIUM_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
+    plt.rc('figure', titlesize=MEDIUM_SIZE)  # fontsize of the figure title
+    bbox = dict(boxstyle="round", fc="0.8")
+    arrowprops = dict(
+        arrowstyle = "->",
+        connectionstyle = "angle,angleA=0,angleB=90,rad=10")
+
+
+
+    ncols = 4
+    nrows = int(np.ceil(len(peaks) / ncols))
+
+    fig = plt.figure(figsize=(ncols*6,4+nrows*4))
+    spec = gridspec.GridSpec(ncols=ncols, nrows=nrows+1, figure=fig)
+    ax = fig.add_subplot(spec[0, :])
+    time_offset = int(np.min(time_supersampled.base))
+    ax.plot(time_supersampled.base-time_offset, loglike_transit.base, c='k', lw = 1 )
+    ax.axhline(args.threshold, c='r', lw = 1)
+    ax.set(xlabel = r'$T_{i}$' + ' [JD - {:,}]'.format(time_offset), ylabel = r'$\Delta \log \mathcal{L}$',
+			ylim = (0, None), xlim = (np.min(time_supersampled.base-time_offset), np.max(time_supersampled.base-time_offset)))
+    for i in range(len(peaks)):
+        ax.text(time_supersampled.base[peaks[i]]-time_offset, loglike_transit.base[peaks[i]] + 0.05*np.max(loglike_transit.base[peaks])  , 'Peak {:}\n'.format(i+1) + r'$\mathcal{L}$ = ' + '{:,.2f}'.format(loglike_transit.base[peaks[i]]), bbox=bbox, horizontalalignment='center', fontsize=7)
+
+
+
+    # Now cycle the plots
+    for i in range(len(peaks)):
+        plot_idxi, plot_idxj = i // ncols, np.mod(i,ncols) #-1
+        ax = fig.add_subplot(spec[plot_idxi+1, plot_idxj])
+
+
+        start = time_supersampled[peaks[i]]- (width)
+        end = time_supersampled[peaks[i]]+ (width)
+        t_m = np.linspace(start, end, 1000)
+        model = lctemplatematch.lc(t_m, t_zero = time_supersampled[peaks[i]], period = args.period, radius_1 = args.radius_1, k=args.k, incl=incl, zp = weighted_mean, fs=args.fs, fc=args.fc, light_3 = args.light_3)
+        depth = np.max(model) -  np.min(model)
+        ylim = (1 - 2*depth, 1 + 1*depth)
+
+
+
+        ax.plot(24*(t_m-time_supersampled[peaks[i]]),model, c='r', zorder=10)
+        ax.plot(24*(t_m-time_supersampled[peaks[i]]),np.ones(t_m.shape[0]), c='r', ls='--', zorder=10, alpha = 0.3)
+
+
+        mask = (t > start) &  (t < end)
+        ax.errorbar(24*(t[mask]-time_supersampled[peaks[i]]), f[mask], yerr=fe[mask], fmt='k.', alpha = raw_alpha)
+
+        ax.set(ylabel='Flux', xlabel = r'Time from $T_{i}$ [hr]', ylim=ylim, title = r'$T_{i}$ = ' + '{:}'.format(time_supersampled[peaks[i]]))
+
+        if bin is not None:
+            t_bin, f_bin, fe_bin = lctemplatematch.lc_bin(t[mask], f[mask], bin / 24 / 60)
+            ax.errorbar(24*(t_bin-time_supersampled[peaks[i]]), f_bin, yerr=fe_bin, fmt='b.', alpha = bin_alpha)
+
+        if plot_idxj > 0 : 
+            ax.set_yticks([])
+            ax.set_ylabel(None)
+
+    plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0., hspace=None)
+
+
+    plt.tight_layout()
+    return fig, ax 
+
+if __name__=="__main__":
+    #####################################################################################
+    # Parse the arguments
+    #####################################################################################
+	args = parse_args()
+
+    #####################################################################################
+    # Now load the data
+    #####################################################################################
+	if args.paophot2:
+		t = Table.read(args.filename)
+		time, flux, flux_err, cam_ids = np.array(t['BJD']) , np.array(t['TARGET_DETRENDED']), np.array(t['TARGET_DETRENDED_ERR']), np.array(t['CAMERA'])
+		
+		# Now normalise
+		for cam in np.unique(cam_ids):
+			flux_err[cam_ids==cam] = flux_err[cam_ids==cam]  / np.median(flux[cam_ids==cam] )
+			flux[cam_ids==cam]  = flux[cam_ids==cam]  / np.median(flux[cam_ids==cam] )
+	else:
+		# First, load the lightcurve
+		try    :	time, flux, flux_err = np.loadtxt(args.filename).T
+		except : time, _, _, flux, flux_err = np.loadtxt(args.filename).T
+	# Check if we have time, mag, mag_err (e.g. WASP)
+	if args.mag : 
+		flux, flux_err = lctemplatematch.lc_mags_to_flux(flux, flux_err)
+		print(flux, np.nanmedian(flux))
+		flux_err = flux_err / np.nanmedian(flux)
+		flux = flux / np.nanmedian(flux)
+
+    #####################################################################################
+    # Now format, mask, and sort the data
+    #####################################################################################
+	mask = np.isnan(flux) | np.isinf(flux) | np.isnan(flux_err) | np.isinf(flux_err) | (flux_err < 1e-4)
+	time = np.array(time[~mask], dtype = np.double)
+	flux = np.array(flux[~mask], dtype = np.double)
+	flux_err = np.array(flux_err[~mask], dtype = np.double)
+	s = np.argsort(time)
+	time, flux, flux_err = time[s], flux[s], flux_err[s]
+	if time.shape[0]==0 : raise ValueError('No valid data.')
+
+
+    #####################################################################################
+    # Now do the injecttion test
+    #####################################################################################
+	incl = 180.*np.arccos( args.radius_1*args.b)/np.pi
+	if args.inject:
+		if args.gradsplit is None : idxs = np.arange(time.shape[0],dtype = int)
+		else: 
+			idxs = lctemplatematch.grad_split_array(time, args.gradsplit)
+			print('Splitting into {:,} nights to get noise profile'.format(len(idxs)))
+		
+		stds = []
+		for idx in idxs:
+			time_offset = int(np.median(time[idx]))
+			stds.append(np.std( flux[idx] / np.poly1d(np.polyfit(time[idx]-time_offset, flux[idx], args.npoly) )(time[idx] - time_offset) ))
+		stds = np.array(stds)
+		stds = stds[~(np.isnan(stds)  | np.isinf(stds))]
+		if stds.shape[0]==0 : raise ValueError('No stds to inject with - check data quality, npoly or decrease gradsplit.')
+		else : 
+			std = np.median(stds)
+			print('Median std is {:}'.format(std))
+
+		# Now we have the noise profile, lets generate some data
+		width = transit_width(args.radius_1, args.k, args.b, P=args.period)
+		time_synth = np.arange(-width/2, width/2, np.median(np.gradient(time)))
+		f_synth = np.random.normal(np.ones(time_synth.shape[0]), std)
+		f_synth_err = np.random.uniform(0.5*std, 1.5*std, time_synth.shape[0])
+		
+		# Now inject at n points through the transit
+		t_zeros = np.linspace(0,1*width, 100)
+		max_deltaL = np.zeros(t_zeros.shape[0])
+		time_in_transit = np.zeros(t_zeros.shape[0])
+
+		for i in range(t_zeros.shape[0]):
+			f_synth_injected = f_synth*lctemplatematch.lc(time_synth, t_zero = t_zeros[i], period = args.period, radius_1 = args.radius_1, k=args.k, incl=incl, zp = 1., fs=args.fs, fc=args.fc, light_3 = args.light_3)
+			time_supersampled, loglike_transit, loglike_line, width, nhalfwidth = lctemplatematch.template_match(time_synth,f_synth_injected,f_synth_err,  
+																						period = args.period, radius_1 = args.radius_1, k=args.k, incl=incl,
+																						zp = 1., fs=args.fs, fc=args.fc, light_3 = args.light_3, nsplit=30)
+				
+			max_deltaL[i] = np.max(loglike_transit.base)
+			time_in_transit[i] = np.clip(width - t_zeros[i], 0, width)
+
+			#plt.figure()
+			#plt.errorbar(time_synth, f_synth_injected, yerr = f_synth_err, fmt='k.')
+			#plt.show()
+
+		fig = plt.figure(figsize=(7,7))
+		spec = gridspec.GridSpec(ncols=3, nrows=3, figure=fig, wspace=0.)
+		ax = fig.add_subplot(spec[:2, :])
+		ax.semilogy(time_in_transit*24, max_deltaL, c='k', lw=1)
+		ax.set(xlabel = 'Time in transt [hr]', ylabel = r'$\Delta \log \mathcal{L}$', title='Injection test for {:}'.format(args.name))
+		
+
+		ax = fig.add_subplot(spec[2, 0])
+		frac = 0.8
+		model = lctemplatematch.lc(time_synth, t_zero = t_zeros[int(frac*len(t_zeros))], period = args.period, radius_1 = args.radius_1, k=args.k, incl=incl, zp = 1., fs=args.fs, fc=args.fc, light_3 = args.light_3)
+		ax.errorbar(24*time_synth, f_synth*model, yerr=f_synth_err , fmt='k.', alpha = args.raw_alpha, ecolor='lightgrey')
+		ax.plot(24*time_synth, model, 'r', zorder=10)
+		time_in_transit = 24*np.clip(width - t_zeros[int(frac*len(t_zeros))], 0, width)
+		ax.set(ylabel='Flux', xlabel='Time [hr]', title = '{:.1f} hr in transit'.format(time_in_transit))
+
+		ax = fig.add_subplot(spec[2, 1])
+		frac = 0.5
+		model = lctemplatematch.lc(time_synth, t_zero = t_zeros[int(frac*len(t_zeros))], period = args.period, radius_1 = args.radius_1, k=args.k, incl=incl, zp = 1., fs=args.fs, fc=args.fc, light_3 = args.light_3)
+		ax.errorbar(24*time_synth, f_synth*model, yerr=f_synth_err , fmt='k.', alpha = args.raw_alpha, ecolor='lightgrey')
+		ax.plot(24*time_synth, model, 'r', zorder=10)
+		time_in_transit = 24*np.clip(width - t_zeros[int(frac*len(t_zeros))], 0, width)
+		ax.set(xlabel='Time [hr]', title = '{:.1f} hr in transit'.format(time_in_transit))
+		ax.set_yticks([])
+
+
+		ax = fig.add_subplot(spec[2, 2])
+		frac = 0.2
+		model = lctemplatematch.lc(time_synth, t_zero = t_zeros[int(frac*len(t_zeros))], period = args.period, radius_1 = args.radius_1, k=args.k, incl=incl, zp = 1., fs=args.fs, fc=args.fc, light_3 = args.light_3)
+		ax.errorbar(24*time_synth, f_synth*model, yerr=f_synth_err , fmt='k.', alpha = args.raw_alpha, ecolor='lightgrey')
+		ax.plot(24*time_synth, model, 'r', zorder=10)
+		time_in_transit = 24*np.clip(width - t_zeros[int(frac*len(t_zeros))], 0, width)
+		ax.set( xlabel='Time [hr]', title = '{:.1f} hr in transit'.format(time_in_transit))
+		ax.set_yticks([])
+
+		plt.tight_layout()
+		#plt.show()
+		plt.savefig('{:}/{:}_TLS_INJECTED.png'.format(args.save_path, args.name))
+
+		exit()
+
+    #####################################################################################
+    # Now calculate the weighted mean which will be the zero-point
+    #####################################################################################
+	weighted_mean = np.median(flux)
+
+
+    #####################################################################################
+    # Now template match
+    #####################################################################################
+	start = Time.now()
+	print('Kernel started {:}'.format(start))
+	time_supersampled, loglike_transit, loglike_line, width, nhalfwidth = lctemplatematch.template_match(time,flux,flux_err,  
+																				 period = args.period, radius_1 = args.radius_1, k=args.k, incl=incl,
+																				 zp = weighted_mean, fs=args.fs, fc=args.fc, light_3 = args.light_3)
+	end = Time.now()
+	print('Kernel finished {:}'.format(end))
+	print('Total time {:,} s'.format((end-start).sec))
+
+
+		
+    #####################################################################################
+    # Now get the peaks plot the loglike 
+    #####################################################################################
+	print(np.median(np.gradient(time_supersampled.base)))
+	print(int(1. /  np.median(np.gradient(time_supersampled.base))))
+	peaks, height = find_peaks( loglike_transit.base, height = args.threshold, distance= int(1.  /  np.median(np.gradient(time_supersampled.base))))
+	#if len(peaks)==0 : raise ValueError('No peaks found. Max loglike = {:} [threshold given is {:}]'.format(np.max(loglike_transit.base), args.threshold))
+    
+	#####################################################################################
+    # Now check for empty peaks
+    #####################################################################################
+	mask = np.ones(len(peaks), dtype = np.bool)
+	nmin = int(args.min_time_in_transit/24. /  np.median(np.gradient(time)))
+	print(nmin)
+	for i in range(len(peaks)):
+		start = time_supersampled[peaks[i]]- (width/2.)
+		end = time_supersampled[peaks[i]]+ (width/2.)
+		N = np.sum((time > start) &  (time < end))
+		if N < nmin : mask[i] = False
+
+	print(time_supersampled.base[np.array(peaks)[~mask]])
+	peaks = np.array(peaks)[mask]
+	#if len(peaks)==0 : raise ValueError('No peaks found after masking. Max loglike = {:} [threshold given is {:}]'.format(np.max(loglike_transit.base), args.threshold))
+
+   #####################################################################################
+    # Now plot the array
+    #####################################################################################
+	#f, ax = plot_loglike(time_supersampled, loglike_transit, args.threshold, peaks)	
+	
+    #####################################################################################
+    # Now gplot the peaks
+    #####################################################################################	
+
+	f, ax = plot_results(time, flux, flux_err, time_supersampled, loglike_transit, peaks,		
+                raw_alpha = args.raw_alpha, bin = args.bin, bin_alpha=args.bin_alpha)
+
+	plt.savefig('{:}/{:}_TLS.png'.format(args.save_path, args.name))
+	plt.show()
+	plt.close()
+
