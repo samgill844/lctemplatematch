@@ -33,7 +33,7 @@ Archival photometry provides means to "pre-cover" either the orbital period or a
 
 
 
-# '''lctemplatematch'''
+# ``lctemplatematch``
 
 The template matching algorithm described by estimates the difference in log-likelihood of a transit model over a null model. Given a series of $n$ observations described time, $t_n$, flux, $F_{n}$, and flux errors, $\sigma_{n}$ we calculate the chi-squared for the null model,
 
