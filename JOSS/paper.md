@@ -68,7 +68,7 @@ We decided to search for transit events of NGTS-2b in NGTS data using a threshol
 
 
 ![Caption for example figure.\label{fig:Figure_1}](Figure_1.png)
-[$\Delta \log \mathcal{L}$ for corresponding values of $T_i$ for the \ngts\ data of NGTS-2b are shown in the upper panel with peaks corresponding to $\Delta \log \mathcal{L} > 500$ annotated. Lower panels show each peak with the transit model (red), null model (red-dashed), raw \ngts\ data (black), and 5-minute binned data (blue).\label{fig:Figure_2}](Figure_2.png)
+[$\Delta \log \mathcal{L}$ for corresponding values of $T_i$ for the NGTS data of NGTS-2b are shown in the upper panel with peaks corresponding to $\Delta \log \mathcal{L} > 500$ annotated. Lower panels show each peak with the transit model (red), null model (red-dashed), raw NGTS data (black), and 5-minute binned data (blue).\label{fig:Figure_2}](Figure_2.png)
 
 # Acknowledgements
 
