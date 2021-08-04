@@ -67,7 +67,7 @@ and corresponding values of $\log \mathcal{L}_{\rm transit,i} = -\chi^2_{\rm tra
 We decided to search for transit events of NGTS-2b in NGTS data using a threshold of $\Delta \log \mathcal{L} > 100$ which is equivalent to at least 30 minutes of in-transit data (Figure \autoref{fig:Figure_2}). In all, we recover 11 transit events with the smallest value of $\Delta \log \mathcal{L} = 1117$. Using the best-fitting orbital solution there is an additional epoch which contains the last 15 minutes of egress. This did correspond to a peak of $\Delta \log \mathcal{L} = 20$ but is consistent with other peaks arising from red-noise and systematic offsets.
 
 
-![Caption for example figure.\label{fig:Figure_1}](Figure_1.png)
+![Caption for example figure.\label{fig:Figure_2}](Figure_2.png)
 [$\Delta \log \mathcal{L}$ for corresponding values of $T_i$ for the NGTS data of NGTS-2b are shown in the upper panel with peaks corresponding to $\Delta \log \mathcal{L} > 500$ annotated. Lower panels show each peak with the transit model (red), null model (red-dashed), raw NGTS data (black), and 5-minute binned data (blue).\label{fig:Figure_2}](Figure_2.png)
 
 # Acknowledgements
