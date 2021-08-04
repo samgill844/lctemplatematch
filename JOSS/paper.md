@@ -27,6 +27,8 @@ hey
 
 # Statement of need
 
+The Transiting Exoplanet Survey Satellite, TESS [@2015JATIS...1a4003R] is well into the extended mission with over 131 published planets and over 4000 \tess\ objects of interest \footnote{tess.mit.edu; accessed 2021-07-20}. The majority of these planets have mean oribtal period of 8 days due in part to the geometric probability of a transit occurring and the 27-day per sector observing strategy. A number objects are seen to exhibit only a single planet-like transit in a \tess\ sector permitting only lower bounds to the orbital period (typically $\gtrsim$ 15 days). These systems are particularly interesting as they extend the possibility of recovering a planet within the habitable zone beyond late M-dwarfs which are not in the continuous viewing zone given the 27-day observing strategy. Work by [@2018A&A...619A.175C; @2019A&A...631A..83C] estimate 339 single transit candidates from southern ecliptic plane of the \tess\ primary mission with approximately 80\% expected to transit again in the extended mission. These numbers are broadly consistent with those by [@2019AJ....157...84V] and represents a bounteous sample of potentially long-period transiting planets and so efforts must be made to determine their physical properties via recovering the orbital period. 
+
 Archival photometry provides means to "pre-cover" either the orbital period or a discrete set of possible aliases. Recent work by  used a box-fitting least squared algorithm with fixed depth, width, and ingress/egress duration with injected transits in Kilodegree Extremely Little Telescope data to efficiently recover the orbital periods of up to 1 year for planets larger than Saturn. other work by  employed a bespoke template matching algorithm in using archival photometry from the Wide Angle Search for Planets to constrain the orbital period to a discrete set of 3 possible aliases for the TESS single transit candidate TIC-238855958. The basis of this algorithm continues to be used as part of an semi-automated algorithm to detect transit events for NGTS observations of TESS single transit candidates that are being  monitored. There are subtleties to this algorithm that were not explicitly discussed by  or  such as optimal step sizes and injection tests to determine a suitable threshold. The aim of this work is to formalise this algorithm and apply it to various test cases and active single transit candidates. 
 
 
@@ -65,7 +67,7 @@ and corresponding values of $\log \mathcal{L}_{\rm transit,i} = -\chi^2_{\rm tra
 We decided to search for transit events of NGTS-2b in NGTS data using a threshold of $\Delta \log \mathcal{L} > 100$ which is equivalent to at least 30 minutes of in-transit data (Figure \autoref{fig:Figure_2}). In all, we recover 11 transit events with the smallest value of $\Delta \log \mathcal{L} = 1117$. Using the best-fitting orbital solution there is an additional epoch which contains the last 15 minutes of egress. This did correspond to a peak of $\Delta \log \mathcal{L} = 20$ but is consistent with other peaks arising from red-noise and systematic offsets.
 
 
-![Caption for example figure.\label{fig:Figure_1}](Figure_1.png)
+[Caption for example figure.\label{fig:Figure_1}](Figure_1.png)
 ![Caption for example figure.\label{fig:Figure_2}](Figure_2.png)
 
 # Acknowledgements
