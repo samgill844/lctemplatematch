@@ -1,5 +1,5 @@
 ---
-title: 'lctemplatematch: A Python package for to identify transit events from archival data'
+title: 'lctemplatematch: A Python package to identify transit events from archival data'
 tags:
   - Python
   - astronomy
